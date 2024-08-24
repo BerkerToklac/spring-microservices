@@ -8,6 +8,10 @@ import com.javaguide.employementservice.mapper.EmployeeMapper;
 import com.javaguide.employementservice.repository.EmployeeRepository;
 import com.javaguide.employementservice.service.APIClient;
 import com.javaguide.employementservice.service.EmployeeService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     private WebClient webClient;
     private APIClient apiClient;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(EmployeeServiceImpl.class);
+
     @Override
     public EmployeeDto saveEmployee(EmployeeDto employeeDto) {
 
@@ -37,6 +43,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         return savedEmployeeDto;
     }
 
+    //@CircuitBreaker(name = "${spring.boot.name}", fallbackMethod = "getDefaultDepartment")
+    @Retry(name = "${spring.boot.name}", fallbackMethod = "getDefaultDepartment")
     @Override
     public APIResponseDto getEmployeeById(Long employeeId) {
         Employee employee = employeeRepository.findById(employeeId).get();
@@ -55,7 +63,10 @@ public class EmployeeServiceImpl implements EmployeeService {
          */
 
         //DepartmentDto departmentDto = entity.getBody();
-
+        DepartmentDto departmentDto = new DepartmentDto();
+        departmentDto.setDepartmentName("R&D Department");
+        departmentDto.setDepartmentCode("RD001");
+        departmentDto.setDepartmentDescription("Research and Development Department");
         DepartmentDto department = apiClient.getDepartment(employee.getDepartmentCode());
 
         EmployeeDto employeeDto = new EmployeeDto(employee.getId(),
@@ -66,7 +77,25 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         APIResponseDto apiResponseDto = new APIResponseDto();
         apiResponseDto.setEmployeeDto(employeeDto);
-        apiResponseDto.setDepartmentDto(department);
+        apiResponseDto.setDepartmentDto(departmentDto);
+        return apiResponseDto;
+    }
+
+    public APIResponseDto getDefaultDepartment(Long employeeId) {
+        LOGGER.info("inside getDefaultDepartment() method");
+
+        Employee employee = employeeRepository.findById(employeeId).get();
+
+        DepartmentDto departmentDto = new DepartmentDto();
+        departmentDto.setDepartmentName("R&D Department");
+        departmentDto.setDepartmentCode("RD001");
+        departmentDto.setDepartmentDescription("Research and Development Department");
+
+        EmployeeDto employeeDto = EmployeeMapper.mapToEmployeeDto(employee);
+
+        APIResponseDto apiResponseDto = new APIResponseDto();
+        apiResponseDto.setEmployeeDto(employeeDto);
+        apiResponseDto.setDepartmentDto(departmentDto);
         return apiResponseDto;
     }
 
